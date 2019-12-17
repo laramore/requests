@@ -1,0 +1,47 @@
+{
+    "name": "laramore/requests",
+    "description": "Create a request for each of your Laramore model",
+    "keywords": ["ORM", "Laravel", "Model", "Migration", "Automatic", "Auto", "Fields", "Field", "Uuid", "Meta", "Table", "Database", "Validations"],
+    "license": "MIT",
+    "config": {
+        "platform": {
+            "php": "7.0.8"
+        }
+    },
+    "require": {
+        "php": ">=7.0.8",
+        "laramore/laramore": "^0.5.5",
+        "laravel/framework": "^5.5"
+    },
+    "authors": [{
+        "name": "Nastuzzi Samy",
+        "email": "samy@nastuzzi.fr"
+    }],
+    "autoload": {
+        "psr-4": {
+            "Laramore\\": "src/"
+        }
+    },
+    "scripts": {
+        "test:lint": [
+            "./vendor/bin/phpcs src",
+            "./vendor/bin/phpmd src text phpmd.xml"
+        ],
+        "fix:lint": [
+            "./vendor/bin/phpcbf src"
+        ],
+        "test:unit": [
+            "./vendor/bin/phpunit --bootstrap vendor/autoload.php tests"
+        ],
+        "test": [
+            "@composer test:lint",
+            "@composer test:unit"
+        ]
+    },
+    "require-dev": {
+        "phpmd/phpmd": ">=2.7",
+        "squizlabs/php_codesniffer": ">=3.5",
+        "phpstan/phpstan": ">=0.9.2",
+        "phpunit/phpunit": ">=6.5"
+    }
+}
