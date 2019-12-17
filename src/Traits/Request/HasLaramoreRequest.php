@@ -10,7 +10,9 @@
 
 namespace Laramore\Traits\Request;
 
-use Laramore\Facades\Validations;
+use Laramore\Facades\{
+    Validations, Rules
+};
 use Laramore\Interfaces\IsALaramoreModel;
 
 trait HasLaramoreRequest
@@ -117,7 +119,7 @@ trait HasLaramoreRequest
         if (\in_array($this->method(), $this->removeRequired)) {
             return \array_map(function ($fieldRules) {
                 return \array_filter($fieldRules, function ($rule) {
-                    return $rule !== 'required';
+                    return $rule !== Rules::required()->native;
                 });
             }, $rules);
         }
