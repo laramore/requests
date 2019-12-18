@@ -52,7 +52,7 @@ class ModelRequestMakeCommand extends BaseGeneratorCommand
     /**
      * Execute the console command.
      *
-     * @return bool|null
+     * @return boolean|null
      */
     public function handle()
     {
@@ -69,6 +69,11 @@ class ModelRequestMakeCommand extends BaseGeneratorCommand
         }
     }
 
+    /**
+     * Execute the console command for one file.
+     *
+     * @return boolean|null
+     */
     public function handleOne()
     {
         return parent::handle();
@@ -81,7 +86,7 @@ class ModelRequestMakeCommand extends BaseGeneratorCommand
      */
     protected function getNameInput()
     {
-        return $this->inputName ?? trim($this->argument('name'));
+        return ($this->inputName ?? trim($this->argument('name')));
     }
 
     /**
@@ -97,7 +102,7 @@ class ModelRequestMakeCommand extends BaseGeneratorCommand
     /**
      * Get the default namespace for the class.
      *
-     * @param  string  $rootNamespace
+     * @param  mixed $rootNamespace
      * @return string
      */
     protected function getDefaultNamespace($rootNamespace)
