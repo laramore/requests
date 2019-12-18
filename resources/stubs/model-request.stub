@@ -1,0 +1,30 @@
+<?php
+/**
+ * Generated with Laramore on DummyDate.
+ *
+ * @var Laramore\Http\Requests\ModelRequest
+ */
+
+namespace DummyNamespace;
+
+use Laramore\Http\Requests\ModelRequest;
+
+class DummyClass extends ModelRequest
+{
+    /**
+     * Define the model class used for this request.
+     * 
+     * @var string
+     */
+    protected $modelClass = DummyModelClass::class;
+
+    /**
+     * Indicate if the user is allowed to access to this request.
+     *
+     * @return boolean
+     */
+    public function authorize(): bool
+    {
+        return true;
+    }
+}
