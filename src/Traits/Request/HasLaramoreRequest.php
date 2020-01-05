@@ -10,6 +10,7 @@
 
 namespace Laramore\Traits\Request;
 
+use Illuminate\Database\Eloquent\Builder;
 use Laramore\Facades\{
     Validations, Rules
 };
@@ -17,6 +18,8 @@ use Laramore\Interfaces\IsALaramoreModel;
 
 trait HasLaramoreRequest
 {
+    use InteractsWithBody;
+
     /**
      * Define the model class used for this request.
      *
@@ -46,20 +49,68 @@ trait HasLaramoreRequest
      *
      * @var bool
      */
-    protected $strictParams = true;
+    protected $strictBody = true;
+
+    /**
+     * Return the model class used to generate rules.
+     *
+     * @return string
+     */
+    protected function getModelClass(): string
+    {
+        return $this->modelClass;
+    }
+
+    /**
+     * Generate a new model.
+     *
+     * @return IsALaramoreModel
+     */
+    public function generateModel(): IsALaramoreModel
+    {
+        $class = $this->getModelClass();
+
+        return new $class;
+    }
+
+    /**
+     * Return a filter builder.
+     *
+     * @param Builder $builder
+     *
+     * @return Builder
+     */
+    protected function filterModel(Builder $builder): Builder
+    {
+        return $builder;
+    }
+
+    /**
+     * Find the model based on the request parameters.
+     *
+     * @param mixed $value
+     *
+     * @return IsALaramoreModel|null
+     */
+    public function findModel($value): ?IsALaramoreModel
+    {
+        return $this->filterModel($this->generateModel()->newQuery())->findOrFail($value);
+    }
 
     /**
      * Resolve the model.
      *
      * @return IsALaramoreModel
      */
-    public function resolveModel(): IsALaramoreModel
+    public function resolveModel(): ?IsALaramoreModel
     {
         if (\count($parameters = $this->route()->parameters())) {
-            return $this->modelClass::find((\array_values($parameters)[0]));
+            $values = \array_values($parameters);
+
+            return $this->findModel(\end($values));
         }
 
-        return new $this->modelClass;
+        return $this->generateModel();
     }
 
     /**
@@ -68,16 +119,6 @@ trait HasLaramoreRequest
      * @return boolean
      */
     abstract public function authorize(): bool;
-
-    /**
-     * Return the model class used to generate rules.
-     *
-     * @return IsALaramoreModel
-     */
-    protected function getModelClass(): string
-    {
-        return $this->modelClass;
-    }
 
     /**
      * Return the validated model.
@@ -128,11 +169,11 @@ trait HasLaramoreRequest
     }
 
     /**
-     * Return all accepted params.
+     * Return all accepted inputs.
      *
      * @return array
      */
-    protected function getAllowedParams()
+    protected function allowedBody()
     {
         return $this->fields();
     }
@@ -146,8 +187,8 @@ trait HasLaramoreRequest
     {
         parent::prepareForValidation();
 
-        if ($this->strictParams) {
-            $keys = \array_diff(\array_keys($this->input()), $this->getAllowedParams());
+        if ($this->strictBody) {
+            $keys = \array_diff(\array_keys($this->body()), $this->allowedBody());
 
             if (\count($keys)) {
                 $validator = $this->getValidatorInstance();
