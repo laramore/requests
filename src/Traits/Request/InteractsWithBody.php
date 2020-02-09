@@ -11,9 +11,17 @@
 namespace Laramore\Traits\Request;
 
 use Illuminate\Support\Arr;
+use Symfony\Component\HttpFoundation\ParameterBag;
 
 trait InteractsWithBody
 {
+    /**
+     * Request body.
+     *
+     * @var array
+     */
+    protected $body;
+
     /**
      * Retrieve an input item from the request body.
      * The body is retrieved only if it is a json content
@@ -29,7 +37,7 @@ trait InteractsWithBody
             if ($this->isJson()) {
                 $this->body = $this->json();
             } else {
-                $this->body = \in_array($this->getRealMethod(), ['GET', 'HEAD']) ? [] : $this->request;
+                $this->body = \in_array($this->getRealMethod(), ['GET', 'HEAD']) ? new ParameterBag() : $this->request;
             }
         }
 

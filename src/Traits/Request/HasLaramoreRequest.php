@@ -10,11 +10,14 @@
 
 namespace Laramore\Traits\Request;
 
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\{
+    Builder, Collection
+};
 use Laramore\Facades\{
-    Validations, Rules
+    Validations, Rule
 };
 use Laramore\Interfaces\IsALaramoreModel;
+use Laramore\Validations\Rule\Forbidden;
 
 trait HasLaramoreRequest
 {
@@ -33,6 +36,13 @@ trait HasLaramoreRequest
      * @var IsALaramoreModel
      */
     protected $model;
+
+    /**
+     * Models resolved from the database.
+     *
+     * @var Collection
+     */
+    protected $models;
 
     /**
      * Rules only apply on defined values.
@@ -74,19 +84,17 @@ trait HasLaramoreRequest
     }
 
     /**
-     * Return a filter builder.
-     *
-     * @param Builder $builder
+     * Generate a new query.
      *
      * @return Builder
      */
-    protected function filterModel(Builder $builder): Builder
+    public function generateModelQuery(): Builder
     {
-        return $builder;
+        return $this->generateModel()->newQuery();
     }
 
     /**
-     * Find the model based on the request parameters.
+     * Find the model.
      *
      * @param mixed $value
      *
@@ -94,7 +102,17 @@ trait HasLaramoreRequest
      */
     public function findModel($value): ?IsALaramoreModel
     {
-        return $this->filterModel($this->generateModel()->newQuery())->findOrFail($value);
+        return $this->generateModelQuery()->findOrFail($value);
+    }
+
+    /**
+     * Get models.
+     *
+     * @return Collection
+     */
+    public function getModels(): Collection
+    {
+        return $this->generateModelQuery()->get();
     }
 
     /**
@@ -104,7 +122,7 @@ trait HasLaramoreRequest
      */
     public function resolveModel(): ?IsALaramoreModel
     {
-        if (\count($parameters = $this->route()->parameters())) {
+        if (\count($parameters = $this->route()->parameters()) > 0) {
             $values = \array_values($parameters);
 
             return $this->findModel(\end($values));
@@ -112,13 +130,6 @@ trait HasLaramoreRequest
 
         return $this->generateModel();
     }
-
-    /**
-     * Indicate if the user is allowed to access to this request.
-     *
-     * @return boolean
-     */
-    abstract public function authorize(): bool;
 
     /**
      * Return the validated model.
@@ -135,37 +146,27 @@ trait HasLaramoreRequest
     }
 
     /**
-     * Return all accepted fields.
+     * Return the validated model.
      *
-     * @return array
+     * @return Collection
      */
-    public function fields(): array
+    public function models(): Collection
     {
-        return \array_map(function ($field) {
-            return $field->getNative();
-        }, \array_filter($this->getModelClass()::getMeta()->getAttributes(), function ($field) {
-            return $field->fillable;
-        }));
+        if (\is_null($this->models)) {
+            $this->models = $this->getModels();
+        }
+
+        return $this->models;
     }
 
     /**
-     * Get the validation rules that apply to the request.
+     * Return all accepted fields.
      *
-     * @return array
+     * @return array<string>
      */
-    public function rules()
+    public function fields(): array
     {
-        $rules = Validations::getHandler($this->getModelClass())->getRules($this->fields());
-
-        if (\in_array($this->method(), $this->removeRequired)) {
-            return \array_map(function ($fieldRules) {
-                return \array_filter($fieldRules, function ($rule) {
-                    return $rule !== Rules::required()->native;
-                });
-            }, $rules);
-        }
-
-        return $rules;
+        return $this->getModelClass()::getMeta()->getRequiredFieldNames();
     }
 
     /**
@@ -179,27 +180,44 @@ trait HasLaramoreRequest
     }
 
     /**
-     * Prepare the data for validation.
+     * Return all accepted body values.
      *
-     * @return void
+     * @return array
      */
-    protected function prepareForValidation()
+    public function allowed()
     {
-        parent::prepareForValidation();
+        $allowedKeys = \array_fill_keys($this->allowedBody(), null);
+
+        return \array_merge($allowedKeys, \array_intersect_key($this->body(), $allowedKeys));
+    }
+
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array
+     */
+    public function rules()
+    {
+        $rules = Validations::getHandler($this->getModelClass())->getRules($this->allowed());
+        $required = Rule::required()->native;
+
+        if (\in_array($this->method(), $this->removeRequired)) {
+            return \array_map(function ($fieldRules) use ($required) {
+                return \array_filter($fieldRules, function ($rule) use ($required) {
+                    return $rule !== $required;
+                });
+            }, $rules);
+        }
 
         if ($this->strictBody) {
             $keys = \array_diff(\array_keys($this->body()), $this->allowedBody());
 
             if (\count($keys)) {
-                $validator = $this->getValidatorInstance();
-
-                foreach ($keys as $key) {
-                    $validator->errors()->add($key, "The $key field is not allowed");
-                }
-
-                $this->failedValidation($validator);
+                $rules = \array_merge($rules, \array_fill_keys($keys, ['forbidden']));
             }
         }
+
+        return $rules;
     }
 
     /**
@@ -213,4 +231,11 @@ trait HasLaramoreRequest
 
         $this->model()->setAttributes($this->validated());
     }
+
+    /**
+     * Indicate if the user is allowed to access to this request.
+     *
+     * @return boolean
+     */
+    abstract public function authorize(): bool;
 }
