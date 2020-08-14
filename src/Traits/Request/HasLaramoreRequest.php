@@ -14,10 +14,9 @@ use Illuminate\Database\Eloquent\{
     Builder, Collection
 };
 use Laramore\Facades\{
-    Validations, Rule
+    Validation, Option
 };
-use Laramore\Interfaces\IsALaramoreModel;
-use Laramore\Validations\Rule\Forbidden;
+use Laramore\Contracts\Eloquent\LaramoreModel;
 
 trait HasLaramoreRequest
 {
@@ -33,7 +32,7 @@ trait HasLaramoreRequest
     /**
      * Model with the validated values.
      *
-     * @var IsALaramoreModel
+     * @var LaramoreModel
      */
     protected $model;
 
@@ -45,7 +44,7 @@ trait HasLaramoreRequest
     protected $models;
 
     /**
-     * Rules only apply on defined values.
+     * Options only apply on defined values.
      * Only 'POST' and 'PUT' need all required values actually.
      *
      * @var array
@@ -62,7 +61,7 @@ trait HasLaramoreRequest
     protected $strictBody = true;
 
     /**
-     * Return the model class used to generate rules.
+     * Return the model class used to generate options.
      *
      * @return string
      */
@@ -74,9 +73,9 @@ trait HasLaramoreRequest
     /**
      * Generate a new model.
      *
-     * @return IsALaramoreModel
+     * @return LaramoreModel
      */
-    public function generateModel(): IsALaramoreModel
+    public function generateModel(): LaramoreModel
     {
         $class = $this->getModelClass();
 
@@ -98,9 +97,9 @@ trait HasLaramoreRequest
      *
      * @param mixed $value
      *
-     * @return IsALaramoreModel|null
+     * @return LaramoreModel|null
      */
-    public function findModel($value): ?IsALaramoreModel
+    public function findModel($value): ?LaramoreModel
     {
         return $this->generateModelQuery()->findOrFail($value);
     }
@@ -118,9 +117,9 @@ trait HasLaramoreRequest
     /**
      * Resolve the model.
      *
-     * @return IsALaramoreModel
+     * @return LaramoreModel
      */
-    public function resolveModel(): ?IsALaramoreModel
+    public function resolveModel(): ?LaramoreModel
     {
         if (\count($parameters = $this->route()->parameters()) > 0) {
             $values = \array_values($parameters);
@@ -134,9 +133,9 @@ trait HasLaramoreRequest
     /**
      * Return the validated model.
      *
-     * @return IsALaramoreModel
+     * @return LaramoreModel
      */
-    public function model(): IsALaramoreModel
+    public function model(): LaramoreModel
     {
         if (\is_null($this->model)) {
             $this->model = $this->resolveModel();
@@ -166,7 +165,17 @@ trait HasLaramoreRequest
      */
     public function fields(): array
     {
-        return $this->getModelClass()::getMeta()->getRequiredFieldNames();
+        $meta = $this->getModelClass()::getMeta();
+        $requiredFields = $this->getModelClass()::getMeta()->getFieldsWithOption('required');
+        $requiredFieldNames = [];
+
+        foreach ($requiredFields as $field) {
+            if ($field->getOwner() === $meta || !\in_array($field->getOwner(), $requiredFields)) {
+                $requiredFieldNames[] = $field->getNative();
+            }
+        }
+
+        return $requiredFieldNames;
     }
 
     /**
@@ -192,32 +201,32 @@ trait HasLaramoreRequest
     }
 
     /**
-     * Get the validation rules that apply to the request.
+     * Get the validation options that apply to the request.
      *
      * @return array
      */
     public function rules()
     {
-        $rules = Validations::getHandler($this->getModelClass())->getRules($this->allowed());
-        $required = Rule::required()->native;
+        $options = Validation::getHandler($this->getModelClass())->getOptions($this->allowed());
+        $required = Option::required()->native;
 
         if (\in_array($this->method(), $this->removeRequired)) {
-            return \array_map(function ($fieldRules) use ($required) {
-                return \array_filter($fieldRules, function ($rule) use ($required) {
-                    return $rule !== $required;
+            return \array_map(function ($fieldOptions) use ($required) {
+                return \array_filter($fieldOptions, function ($option) use ($required) {
+                    return $option !== $required;
                 });
-            }, $rules);
+            }, $options);
         }
 
         if ($this->strictBody) {
             $keys = \array_diff(\array_keys($this->body()), $this->allowedBody());
 
             if (\count($keys)) {
-                $rules = \array_merge($rules, \array_fill_keys($keys, ['forbidden']));
+                $options = \array_merge($options, \array_fill_keys($keys, ['forbidden']));
             }
         }
 
-        return $rules;
+        return $options;
     }
 
     /**
@@ -229,7 +238,7 @@ trait HasLaramoreRequest
     {
         parent::validateResolved();
 
-        $this->model()->setAttributes($this->validated());
+        $this->model()->setRawAttributes($this->validated());
     }
 
     /**

@@ -10,8 +10,7 @@
     },
     "require": {
         "php": ">=7.0.8",
-        "laramore/laramore": "^0.5.5",
-        "laravel/framework": "^5.5"
+        "laramore/validations": ">=0.7.0"
     },
     "authors": [{
         "name": "Nastuzzi Samy",

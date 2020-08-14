@@ -10,7 +10,7 @@
 
 namespace Laramore\Commands;
 
-use Laramore\Facades\Metas;
+use Laramore\Facades\Meta;
 
 class ModelRequestMakeCommand extends BaseGeneratorCommand
 {
@@ -59,7 +59,7 @@ class ModelRequestMakeCommand extends BaseGeneratorCommand
         if ($this->option('all')) {
             $baseName = trim($this->argument('name'));
 
-            foreach (Metas::all() as $meta) {
+            foreach (Meta::all() as $meta) {
                 $this->inputName = $meta->getModelClassName().$baseName;
 
                 $this->handleOne();
