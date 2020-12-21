@@ -8,7 +8,7 @@
  * @license MIT
  */
 
-namespace Laramore\Traits\Request;
+namespace Laramore\Traits\Http\Requests;
 
 use Illuminate\Support\Arr;
 use Symfony\Component\HttpFoundation\ParameterBag;

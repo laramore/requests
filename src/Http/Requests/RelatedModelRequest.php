@@ -10,7 +10,7 @@
 
 namespace Laramore\Http\Requests;
 
-use Laramore\Traits\Request\HasLaramoreRelatedRequest;
+use Laramore\Traits\Http\Requests\HasLaramoreRelatedRequest;
 
 abstract class RelatedModelRequest extends ModelRequest
 {

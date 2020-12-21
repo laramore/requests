@@ -11,7 +11,7 @@
 namespace Laramore\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Laramore\Traits\Request\HasLaramoreRequest;
+use Laramore\Traits\Http\Requests\HasLaramoreRequest;
 
 abstract class ModelRequest extends FormRequest
 {

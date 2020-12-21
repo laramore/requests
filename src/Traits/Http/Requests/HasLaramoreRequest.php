@@ -8,15 +8,16 @@
  * @license MIT
  */
 
-namespace Laramore\Traits\Request;
+namespace Laramore\Traits\Http\Requests;
 
+use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\{
     Builder, Collection
 };
-use Laramore\Facades\{
-    Validation, Option
-};
+use Illuminate\Pagination\Paginator;
+use Laramore\Facades\Validation;
 use Laramore\Contracts\Eloquent\LaramoreModel;
+use Laramore\Eloquent\FilterMeta;
 
 trait HasLaramoreRequest
 {
@@ -44,13 +45,31 @@ trait HasLaramoreRequest
     protected $models;
 
     /**
+     * Paged models resolved from the database.
+     *
+     * @var Collection
+     */
+    protected $paginate;
+
+    /**
+     * All filters.
+     *
+     * @var Collection
+     */
+    protected $filters;
+
+    /**
      * Options only apply on defined values.
      * Only 'POST' and 'PUT' need all required values actually.
      *
      * @var array
      */
     protected $removeRequired = [
-        self::METHOD_HEAD, self::METHOD_GET, self::METHOD_PATCH,
+        self::METHOD_HEAD, self::METHOD_GET, self::METHOD_PATCH, self::METHOD_DELETE
+    ];
+
+    protected $requiredRules = [
+        'required', 'required_unless', 'required_without', 'requied_without_all',
     ];
 
     /**
@@ -65,9 +84,19 @@ trait HasLaramoreRequest
      *
      * @return string
      */
-    protected function getModelClass(): string
+    public function getModelClass(): string
     {
         return $this->modelClass;
+    }
+
+    public function getFilterMeta()
+    {
+        return $this->filterMeta;
+    }
+
+    public function getMeta()
+    {
+        return $this->getModelClass()::getMeta();
     }
 
     /**
@@ -89,7 +118,9 @@ trait HasLaramoreRequest
      */
     public function generateModelQuery(): Builder
     {
-        return $this->generateModel()->newQuery();
+        $builder = $this->generateModel()->newQuery();
+
+        return $this->getFilterMeta()->filterBuilder($builder, $this->filters);
     }
 
     /**
@@ -99,27 +130,43 @@ trait HasLaramoreRequest
      *
      * @return LaramoreModel|null
      */
-    public function findModel($value): ?LaramoreModel
+    public function findModel($value)
     {
-        return $this->generateModelQuery()->findOrFail($value);
+        $model = $this->generateModelQuery()->findOrFail($value);
+
+        return $this->getFilterMeta()->filterModel($model, $this->filters);
     }
 
     /**
      * Get models.
      *
-     * @return Collection
+     * @return Collection|mixed
      */
-    public function getModels(): Collection
+    public function getModels()
     {
-        return $this->generateModelQuery()->get();
+        $collection = $this->generateModelQuery()->get();
+
+        return $this->getFilterMeta()->filterCollection($collection, $this->filters);
+    }
+
+    /**
+     * Get page.
+     *
+     * @return Paginator|mixed
+     */
+    public function getPaginate()
+    {
+        $paginate = $this->generateModelQuery()->paginate();
+        return $paginate;
+        return $this->getFilterMeta()->filterCollection($paginate, $this->filters);
     }
 
     /**
      * Resolve the model.
      *
-     * @return LaramoreModel
+     * @return LaramoreModel|mixed
      */
-    public function resolveModel(): ?LaramoreModel
+    public function resolveModel()
     {
         if (\count($parameters = $this->route()->parameters()) > 0) {
             $values = \array_values($parameters);
@@ -131,11 +178,22 @@ trait HasLaramoreRequest
     }
 
     /**
+     * Define all filters of this request.
+     *
+     * @param FilterMeta $meta
+     * @return void
+     */
+    public static function filter(FilterMeta $meta)
+    {
+        // Filters defined by user.
+    }
+
+    /**
      * Return the validated model.
      *
-     * @return LaramoreModel
+     * @return LaramoreModel|mixed
      */
-    public function model(): LaramoreModel
+    public function model()
     {
         if (\is_null($this->model)) {
             $this->model = $this->resolveModel();
@@ -145,11 +203,11 @@ trait HasLaramoreRequest
     }
 
     /**
-     * Return the validated model.
+     * Return the validated models.
      *
-     * @return Collection
+     * @return Collection|mixed
      */
-    public function models(): Collection
+    public function models()
     {
         if (\is_null($this->models)) {
             $this->models = $this->getModels();
@@ -159,14 +217,28 @@ trait HasLaramoreRequest
     }
 
     /**
+     * Return the validated model page.
+     *
+     * @return Paginator|mixed
+     */
+    public function paginate()
+    {
+        if (\is_null($this->paginate)) {
+            $this->paginate = $this->getPaginate();
+        }
+
+        return $this->paginate;
+    }
+
+    /**
      * Return all accepted fields.
      *
      * @return array<string>
      */
     public function fields(): array
     {
-        $meta = $this->getModelClass()::getMeta();
-        $requiredFields = $this->getModelClass()::getMeta()->getFieldsWithOption('required');
+        $meta = $this->getMeta();
+        $requiredFields = $meta->getFieldsWithOption('required');
         $requiredFieldNames = [];
 
         foreach ($requiredFields as $field) {
@@ -207,26 +279,49 @@ trait HasLaramoreRequest
      */
     public function rules()
     {
-        $options = Validation::getHandler($this->getModelClass())->getOptions($this->allowed());
-        $required = Option::required()->native;
+        $rules = Validation::getHandler($this->getModelClass())->getRules($this->allowed());
 
         if (\in_array($this->method(), $this->removeRequired)) {
-            return \array_map(function ($fieldOptions) use ($required) {
-                return \array_filter($fieldOptions, function ($option) use ($required) {
-                    return $option !== $required;
+            return \array_map(function ($fieldRules) {
+                return \array_filter($fieldRules, function ($rule) {
+                    return !Str::startsWith($rule, $this->requiredRules);
                 });
-            }, $options);
+            }, $rules);
         }
 
         if ($this->strictBody) {
             $keys = \array_diff(\array_keys($this->body()), $this->allowedBody());
 
             if (\count($keys)) {
-                $options = \array_merge($options, \array_fill_keys($keys, ['forbidden']));
+                $rules = \array_merge($rules, \array_fill_keys($keys, ['forbidden']));
             }
         }
 
-        return $options;
+        return $rules;
+    }
+
+    protected function generateFilter()
+    {
+        $this->filterMeta = new FilterMeta($this);
+
+        static::filter($this->filterMeta);
+    }
+
+    /**
+     * Prepare the data for validation.
+     *
+     * @return void
+     */
+    protected function prepareForValidation()
+    {
+        parent::prepareForValidation();
+
+        $this->filters = collect($this->query());
+        if ($this->has('_filters')) {
+            $this->filters = $this->filters->merge($this->input('_filters'));
+
+            $this->offsetUnset('_filters');
+        }
     }
 
     /**
@@ -237,6 +332,8 @@ trait HasLaramoreRequest
     public function validateResolved()
     {
         parent::validateResolved();
+
+        $this->generateFilter();
 
         $this->model()->setRawAttributes($this->validated());
     }

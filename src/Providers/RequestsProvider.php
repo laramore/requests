@@ -16,6 +16,19 @@ use Laramore\Commands\ModelRequestMakeCommand;
 class RequestsProvider extends ServiceProvider
 {
     /**
+     * Before booting, create our definition for migrations.
+     *
+     * @return void
+     */
+    public function register()
+    {
+        $this->mergeConfigFrom(
+            __DIR__.'/../../config/filter.php',
+            'filter',
+        );
+    }
+
+    /**
      * During booting, load our migration views, Migration singletons.
      *
      * @return void
@@ -27,5 +40,9 @@ class RequestsProvider extends ServiceProvider
                 ModelRequestMakeCommand::class,
             ]);
         }
+
+        $this->publishes([
+            __DIR__.'/../../config/filter.php' => $this->app->make('path.config').'/filter.php',
+        ]);
     }
 }

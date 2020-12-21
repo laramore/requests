@@ -8,7 +8,7 @@
  * @license MIT
  */
 
-namespace Laramore\Traits\Request;
+namespace Laramore\Traits\Http\Requests;
 
 use Illuminate\Database\Eloquent\{
     Builder, Collection, Relations\Relation
@@ -100,7 +100,7 @@ trait HasLaramoreRelatedRequest
         if (\count($parameters = $this->route()->parameters()) > 1) {
             $values = \array_values($parameters);
 
-            return $this->findBaseModel($values[\count($values) - 2]);
+            return $this->findBaseModel($values[(\count($values) - 2)]);
         }
 
         return $this->generateBaseModel();
