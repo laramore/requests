@@ -26,14 +26,14 @@ class Search extends BaseFilter implements BuilderFilter
 {
     use HasFieldParameter, HasOperatorParameter;
 
-    protected $allowedBooleans;
+    protected $allowedValues;
 
     public function getDefaultParams(): array
     {
         return [
             'field' => null,
             'operator' => ($this->operators[0] ?? '='),
-            'boolean' => ($this->allowedBooleans[0] ?? 'and'),
+            'boolean' => ($this->allowedValues[0] ?? 'and'),
         ];
     }
 
@@ -44,7 +44,7 @@ class Search extends BaseFilter implements BuilderFilter
 
     protected function checkBoolean($value=null)
     {
-        if (!\in_array($value, $this->allowedBooleans)) {
+        if (!\in_array($value, $this->allowedValues)) {
             throw new \Exception('Give right boolean');
         }
 

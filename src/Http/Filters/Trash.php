@@ -31,13 +31,13 @@ class Trash extends BaseFilter implements BuilderFilter
             return $value;
         }
 
-        throw new \Exception('Only with, without or only');
+        throw new \Exception("{$value} is not allowed for filter. Use only ".\implode(', ', $this->allowedValues));
     }
 
     public function filterBuilder(LaramoreBuilder $builder, Collection $params): ?LaramoreBuilder
     {
-        $value = $params->get('with');
+        $value = $params->get('value');
 
-        return $builder->{$value.'Treshed'}();
+        return $builder->{$value.'Trashed'}();
     }
 }

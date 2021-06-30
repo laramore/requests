@@ -31,7 +31,7 @@ return [
             'max' => 100,
         ],
         Search::class => [
-            'allowed_booleans' => ['or', 'and'],
+            'allowed_values' => ['or', 'and'],
             'only' => ['eq', 'equal', 'not_eq', 'not_equal', 'like', 'not_like'],
         ],
         Trash::class => [

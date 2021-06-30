@@ -242,7 +242,7 @@ trait HasLaramoreRequest
         $requiredFieldNames = [];
 
         foreach ($requiredFields as $field) {
-            if ($field->getOwner() === $meta || !\in_array($field->getOwner(), $requiredFields)) {
+            if ($field->getOwner() === $meta || \in_array($field->getOwner(), $requiredFields)) {
                 $requiredFieldNames[] = $field->getNative();
             }
         }
