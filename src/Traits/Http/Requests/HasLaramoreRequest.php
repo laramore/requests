@@ -84,19 +84,19 @@ trait HasLaramoreRequest
      *
      * @return string
      */
-    public function getModelClass(): string
+    public function modelClass(): string
     {
         return $this->modelClass;
     }
 
-    public function getFilterMeta()
+    public function filterMeta()
     {
         return $this->filterMeta;
     }
 
-    public function getMeta()
+    public function meta()
     {
-        return $this->getModelClass()::getMeta();
+        return $this->modelClass()::meta();
     }
 
     /**
@@ -106,7 +106,7 @@ trait HasLaramoreRequest
      */
     public function generateModel(): LaramoreModel
     {
-        $class = $this->getModelClass();
+        $class = $this->modelClass();
 
         return new $class;
     }
@@ -120,7 +120,7 @@ trait HasLaramoreRequest
     {
         $builder = $this->generateModel()->newQuery();
 
-        return $this->getFilterMeta()->filterBuilder($builder, $this->filters);
+        return $this->filterMeta()->filterBuilder($builder, $this->filters);
     }
 
     /**
@@ -134,7 +134,7 @@ trait HasLaramoreRequest
     {
         $model = $this->generateModelQuery()->findOrFail($value);
 
-        return $this->getFilterMeta()->filterModel($model, $this->filters);
+        return $this->filterMeta()->filterModel($model, $this->filters);
     }
 
     /**
@@ -146,7 +146,7 @@ trait HasLaramoreRequest
     {
         $collection = $this->generateModelQuery()->get();
 
-        return $this->getFilterMeta()->filterCollection($collection, $this->filters);
+        return $this->filterMeta()->filterCollection($collection, $this->filters);
     }
 
     /**
@@ -158,7 +158,7 @@ trait HasLaramoreRequest
     {
         $paginate = $this->generateModelQuery()->paginate();
         return $paginate;
-        return $this->getFilterMeta()->filterCollection($paginate, $this->filters);
+        return $this->filterMeta()->filterCollection($paginate, $this->filters);
     }
 
     /**
@@ -186,6 +186,28 @@ trait HasLaramoreRequest
     public static function filter(FilterMeta $meta)
     {
         // Filters defined by user.
+    }
+
+    /**
+     * Retrieve an input item from the request.
+     *
+     * @param  string|null  $key
+     * @param  mixed  $default
+     * @return mixed
+     */
+    public function input($key = null, $default = null)
+    {
+        if (is_null($key)) {
+            $all = parent::input($key, $default);
+
+            foreach ($all as $key => $value) {
+                $all[$key] = $this->meta()->getField($key)->cast($value);
+            }
+
+            return $all;
+        }
+
+        return $this->meta()->getField($key)->cast(parent::input($key, $default));
     }
 
     /**
@@ -237,7 +259,7 @@ trait HasLaramoreRequest
      */
     public function fields(): array
     {
-        $meta = $this->getMeta();
+        $meta = $this->meta();
         $requiredFields = $meta->getFieldsWithOption('required');
         $requiredFieldNames = [];
 
@@ -279,12 +301,12 @@ trait HasLaramoreRequest
      */
     public function rules()
     {
-        $rules = Validation::getHandler($this->getModelClass())->getRules($this->allowed());
+        $rules = Validation::getHandler($this->modelClass())->getRules($this->allowed(), true);
 
         if (\in_array($this->method(), $this->removeRequired)) {
             return \array_map(function ($fieldRules) {
                 return \array_filter($fieldRules, function ($rule) {
-                    return !Str::startsWith($rule, $this->requiredRules);
+                    return ! is_string($rule) || ! Str::startsWith($rule, $this->requiredRules);
                 });
             }, $rules);
         }
