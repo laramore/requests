@@ -96,7 +96,7 @@ trait HasLaramoreRequest
 
     public function meta()
     {
-        return $this->modelClass()::meta();
+        return $this->modelClass()::getMeta();
     }
 
     /**
@@ -124,27 +124,57 @@ trait HasLaramoreRequest
     }
 
     /**
-     * Find the model.
-     *
-     * @param mixed $value
+     * Resolve the model.
      *
      * @return LaramoreModel|null
      */
-    public function findModel($value)
+    public function resolveModel()
     {
-        $model = $this->generateModelQuery()->findOrFail($value);
+        $parameters = $this->route()->parameters();
+
+        if (\count($parameters) > 0) {
+            $values = \array_values($parameters);
+
+            return $this->generateModelQuery()->findOrFail(\end($values));
+        }
+
+        return $this->generateModel();
+    }
+
+    /**
+     * Get model.
+     *
+     * @return LaramoreModel|null
+     */
+    public function getModel()
+    {
+        $model = $this->resolveModel();
+
+        if ($model) {
+            $model->setRawAttributes($this->validated());
+        }
 
         return $this->filterMeta()->filterModel($model, $this->filters);
     }
 
     /**
+     * Resolve models.
+     *
+     * @return Collection|null
+     */
+    public function resolveModels()
+    {
+        return $this->generateModelQuery()->get();
+    }
+
+    /**
      * Get models.
      *
-     * @return Collection|mixed
+     * @return Collection|null
      */
     public function getModels()
     {
-        $collection = $this->generateModelQuery()->get();
+        $collection = $this->resolveModels();
 
         return $this->filterMeta()->filterCollection($collection, $this->filters);
     }
@@ -157,24 +187,8 @@ trait HasLaramoreRequest
     public function getPaginate()
     {
         $paginate = $this->generateModelQuery()->paginate();
-        return $paginate;
+
         return $this->filterMeta()->filterCollection($paginate, $this->filters);
-    }
-
-    /**
-     * Resolve the model.
-     *
-     * @return LaramoreModel|mixed
-     */
-    public function resolveModel()
-    {
-        if (\count($parameters = $this->route()->parameters()) > 0) {
-            $values = \array_values($parameters);
-
-            return $this->findModel(\end($values));
-        }
-
-        return $this->generateModel();
     }
 
     /**
@@ -218,7 +232,7 @@ trait HasLaramoreRequest
     public function model()
     {
         if (\is_null($this->model)) {
-            $this->model = $this->resolveModel();
+            $this->model = $this->getModel();
         }
 
         return $this->model;
@@ -356,8 +370,34 @@ trait HasLaramoreRequest
         parent::validateResolved();
 
         $this->generateFilter();
+    }
 
-        $this->model()->setRawAttributes($this->validated());
+    /**
+     * Dynamically handle calls to the class.
+     *
+     * @param  string  $method
+     * @param  array  $parameters
+     * @return mixed
+     *
+     * @throws \BadMethodCallException
+     */
+    public function __call($method, $parameters)
+    {
+        if (static::hasMacro($method)) {
+            return parent::__call($method, $parameters);
+        }
+
+        $modelName = $this->meta()->getModelName();
+
+        if ($method === $modelName) {
+            return $this->model();
+        }
+
+        if ($method === Str::plural($modelName)) {
+            return $this->models();
+        }
+
+        return parent::__call($method, $parameters);
     }
 
     /**

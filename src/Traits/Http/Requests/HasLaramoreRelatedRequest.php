@@ -10,10 +10,10 @@
 
 namespace Laramore\Traits\Http\Requests;
 
-use Illuminate\Database\Eloquent\{
-    Builder, Collection, Relations\Relation
-};
-use Laramore\Contracts\Eloquent\LaramoreModel;
+use Illuminate\Support\Arr;
+use Laramore\Contracts\Field\ManyRelationField;
+use Laramore\Contracts\Field\RelationField;
+use Laramore\Facades\Operator;
 
 trait HasLaramoreRelatedRequest
 {
@@ -22,169 +22,140 @@ trait HasLaramoreRelatedRequest
     }
 
     /**
-     * Based model used to resolve the model of this request.
+     * Relation to model.
      *
-     * @var string
+     * @var array
      */
-    protected $baseModelClass;
+    protected $related;
 
     /**
-     * Relation between base model and the final model.
+     * Related resolved models.
      *
-     * @var string
+     * @var array
      */
-    protected $modelRelation;
+    protected $relatedModels = [];
 
     /**
-     * Return the base model class.
+     * Return model related models.
      *
-     * @return string
+     * @return array
      */
-    protected function getBaseModelClass(): string
+    protected function related(): array
     {
-        return $this->baseModelClass;
+        return $this->related;
     }
 
     /**
-     * Generate a new base model.
-     *
-     * @return LaramoreModel
-     */
-    public function generateBaseModel(): LaramoreModel
-    {
-        $class = $this->getBaseModelClass();
-
-        return new $class;
-    }
-
-    /**
-     * Generate a new base query.
-     *
-     * @return Builder
-     */
-    public function generateBaseModelQuery(): Builder
-    {
-        return $this->generateBaseModel()->newQuery();
-    }
-
-    /**
-     * Find the base model.
-     *
-     * @param mixed $value
+     * Resolve the model.
      *
      * @return LaramoreModel|null
      */
-    public function findBaseModel($value): ?LaramoreModel
+    public function resolveModel()
     {
-        return $this->generateBaseModelQuery()->findOrFail($value);
-    }
+        $meta = $this->meta();
+        $query = $this->generateModelQuery();
+        $related = $this->related();
+        $parameters = array_reverse($this->route()->parameters(), true);
 
-    /**
-     * Get base models.
-     *
-     * @return Collection
-     */
-    public function getBaseModels(): Collection
-    {
-        return $this->generateBaseModelQuery()->get();
-    }
+        if (count($related) === count($parameters)) {
+            $model = $this->generateModel();
 
-    /**
-     * Resolve the base model.
-     *
-     * @return LaramoreModel
-     */
-    public function resolveBaseModel(): ?LaramoreModel
-    {
-        dd($this->route()->parameters());
-        if (\count($parameters = $this->route()->parameters()) > 1) {
-            $values = \array_values($parameters);
+            // TODO: Set throught relations.
 
-            return $this->findBaseModel($values[(\count($values) - 2)]);
+            return $model;
         }
 
-        return $this->generateBaseModel();
-    }
+        $key = \array_keys($parameters)[0];
+        $value = $parameters[$key];
+        unset($parameters[$key]);
 
-    /**
-     * Return the validated base model.
-     *
-     * @return LaramoreModel
-     */
-    public function baseModel(): LaramoreModel
-    {
-        if (\is_null($this->baseModel)) {
-            $this->baseModel = $this->resolveBaseModel();
+        if (count($related) !== count($parameters)) {
+            throw new \LogicException('Number of parameters does not match the number of related');
         }
 
-        return $this->baseModel;
-    }
-
-    /**
-     * Return the validated base models.
-     *
-     * @return Collection
-     */
-    public function baseModels(): Collection
-    {
-        if (\is_null($this->baseModels)) {
-            $this->baseModels = $this->getBaseModels();
+        if (! Arr::isAssoc($related)) {
+            $related = array_combine(array_keys($parameters), array_reverse($related));
+        } else {
+            $related = array_reverse($related);
         }
 
-        return $this->baseModels;
-    }
+        $this->related = array_reverse($related);
 
-    /**
-     * Generate a new model.
-     *
-     * @return Relation
-     */
-    public function generateRelation(LaramoreModel $baseModel): Relation
-    {
-        return \call_user_func([$baseModel, $this->modelRelation]);
-    }
+        foreach ($parameters as $name => $key) {
+            $relation = $meta->getField($name, RelationField::class);
 
-    /**
-     * Generate a new query.
-     *
-     * @return Builder
-     */
-    public function generateModelQuery(LaramoreModel $baseModel=null): Builder
-    {
-        if (\is_null($baseModel)) {
-            return $this->generateDetachedModelQuery();
+            if ($relation instanceof ManyRelationField) {
+                throw new \Exception('Cannot resolve many models from a one relation: '.$name);
+            }
+
+            $relation->where($query, Operator::equal(), [$key]);
         }
 
-        return $this->generateRelation($baseModel);
+        return $query->findOrFail($value);
     }
 
     /**
-     * Find the model based on the request parameters.
+     * Resolve models.
      *
-     * @param mixed $value
-     *
-     * @return LaramoreModel|null
+     * @return Collection|null
      */
-    public function findModel($baseValue, $value=null): ?LaramoreModel
+    public function resolveModels()
     {
-        if (\is_null($value)) {
-            [$baseValue, $value] = [$value, $baseValue];
+        $meta = $this->meta();
+        $query = $this->generateModelQuery();
+        $related = $this->related();
+        $parameters = array_reverse($this->route()->parameters(), true);
+
+        if (count($related) !== count($parameters)) {
+            throw new \LogicException('Number of parameters does not match the number of related');
         }
 
-        $baseModel = \is_null($baseValue) ? $this->baseModel() : $this->findBaseModel($baseValue);
+        if (! Arr::isAssoc($related)) {
+            $related = array_combine(array_keys($parameters), array_reverse($related));
+        } else {
+            $related = array_reverse($related);
+        }
 
-        return $this->generateRelation($baseModel)->findOrFail($value);
+        $this->related = array_reverse($related);
+
+        foreach ($parameters as $name => $key) {
+            $relation = $meta->getField($name, RelationField::class);
+
+            if ($relation instanceof ManyRelationField) {
+                throw new \Exception('Cannot resolve many models from a one relation: '.$name);
+            }
+
+            $relation->where($query, Operator::equal(), [$key]);
+        }
+
+        return $query->get();
     }
 
     /**
-     * Get models.
+     * Dynamically handle calls to the class.
      *
-     * @return Collection
+     * @param  string  $method
+     * @param  array  $parameters
+     * @return mixed
+     *
+     * @throws \BadMethodCallException
      */
-    public function getModels($baseValue=null): Collection
-    {
-        $baseModel = \is_null($baseValue) ? $this->baseModel() : $this->findBaseModel($baseValue);
+    // public function __call($method, $parameters)
+    // {
+    //     if (static::hasMacro($method)) {
+    //         return parent::__call($method, $parameters);
+    //     }
 
-        return $this->generateRelation($baseModel)->get();
-    }
+    //     $modelName = $this->meta()->getModelName();
+
+    //     if ($method === $modelName) {
+    //         return $this->model();
+    //     }
+
+    //     if ($method === Str::plural($modelName)) {
+    //         return $this->models();
+    //     }
+
+    //     return parent::__call($method, $parameters);
+    // }
 }
