@@ -120,7 +120,7 @@ trait HasLaramoreRequest
     {
         $builder = $this->generateModel()->newQuery();
 
-        return $this->filterMeta()->filterBuilder($builder, $this->filters);
+        return $this->filterMeta()->filterBuilder($builder, $this->filters());
     }
 
     /**
@@ -154,7 +154,7 @@ trait HasLaramoreRequest
             $model->setRawAttributes($this->validated());
         }
 
-        return $this->filterMeta()->filterModel($model, $this->filters);
+        return $this->filterMeta()->filterModel($model, $this->filters());
     }
 
     /**
@@ -176,7 +176,7 @@ trait HasLaramoreRequest
     {
         $collection = $this->resolveModels();
 
-        return $this->filterMeta()->filterCollection($collection, $this->filters);
+        return $this->filterMeta()->filterCollection($collection, $this->filters());
     }
 
     /**
@@ -188,7 +188,7 @@ trait HasLaramoreRequest
     {
         $paginate = $this->generateModelQuery()->paginate();
 
-        return $this->filterMeta()->filterCollection($paginate, $this->filters);
+        return $this->filterMeta()->filterCollection($paginate, $this->filters());
     }
 
     /**
@@ -215,13 +215,21 @@ trait HasLaramoreRequest
             $all = parent::input($key, $default);
 
             foreach ($all as $key => $value) {
+                if (! $this->meta()->hasField($key)) continue;
+
                 $all[$key] = $this->meta()->getField($key)->cast($value);
             }
 
             return $all;
         }
 
-        return $this->meta()->getField($key)->cast(parent::input($key, $default));
+        $value = parent::input($key, $default);
+
+        if (! $this->meta()->hasField($key)) {
+            return $value;
+        }
+
+        return $this->meta()->getField($key)->cast($value);
     }
 
     /**
@@ -336,6 +344,11 @@ trait HasLaramoreRequest
         return $rules;
     }
 
+    public function filters()
+    {
+        return $this->filters;
+    }
+
     protected function generateFilter()
     {
         $this->filterMeta = new FilterMeta($this);
@@ -353,6 +366,7 @@ trait HasLaramoreRequest
         parent::prepareForValidation();
 
         $this->filters = collect($this->query());
+
         if ($this->has('_filters')) {
             $this->filters = $this->filters->merge($this->input('_filters'));
 

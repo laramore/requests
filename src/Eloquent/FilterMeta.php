@@ -18,11 +18,13 @@ use Laramore\Contracts\Eloquent\{
     LaramoreBuilder, LaramoreCollection, LaramoreMeta, LaramoreModel
 };
 use Laramore\Contracts\Http\Filters\{
-    BuilderFilter, CollectionFilter, ModelFilter
+    BuilderFilter, CollectionFilter, ModelFilter,
+    RelatedFilter
 };
+use Laramore\Exceptions\FilterException;
 use Laramore\Http\Filters\BaseFilter;
 
-class FilterMeta implements BuilderFilter, CollectionFilter, ModelFilter
+class FilterMeta implements BuilderFilter, CollectionFilter, ModelFilter, RelatedFilter
 {
     /**
      * Request used by this filter.
@@ -69,9 +71,9 @@ class FilterMeta implements BuilderFilter, CollectionFilter, ModelFilter
         return collect($params);
     }
 
-    public function filterBuilder(LaramoreBuilder $builder, Collection $params): ?LaramoreBuilder
+    public function filterBuilder(LaramoreBuilder $builder, Collection $filters): ?LaramoreBuilder
     {
-        foreach ($params as $filterName => $filterValue) {
+        foreach ($filters as $filterName => $filterValue) {
             $filter = $this->getFilter($filterName);
 
             if ($filter instanceof BuilderFilter) {
@@ -88,9 +90,9 @@ class FilterMeta implements BuilderFilter, CollectionFilter, ModelFilter
         return $builder;
     }
 
-    public function filterCollection(LaramoreCollection $collection, Collection $params): ?LaramoreCollection
+    public function filterCollection(LaramoreCollection $collection, Collection $filters): ?LaramoreCollection
     {
-        foreach ($params as $filterName => $filterValue) {
+        foreach ($filters as $filterName => $filterValue) {
             $filter = $this->getFilter($filterName);
 
             if ($filter instanceof CollectionFilter) {
@@ -107,14 +109,33 @@ class FilterMeta implements BuilderFilter, CollectionFilter, ModelFilter
         return $collection;
     }
 
-    public function filterModel(LaramoreModel $model, Collection $params): ?LaramoreModel
+    public function filterModel(LaramoreModel $model, Collection $filters): ?LaramoreModel
     {
-        foreach ($params as $filterName => $filterValue) {
+        foreach ($filters as $filterName => $filterValue) {
             $filter = $this->getFilter($filterName);
 
             if ($filter instanceof ModelFilter) {
                 foreach ($this->buildParams($filterValue) as $filterParams) {
                     $model = $filter->filterModel($model, $filter->buildParams($filterParams));
+
+                    if (\is_null($model)) {
+                        return null;
+                    }
+                }
+            }
+        }
+
+        return $model;
+    }
+
+    public function filterRelated(LaramoreModel $model, Collection $filters): ?LaramoreModel
+    {
+        foreach ($filters as $filterName => $filterValue) {
+            $filter = $this->getFilter($filterName);
+
+            if ($filter instanceof RelatedFilter) {
+                foreach ($this->buildParams($filterValue) as $filterParams) {
+                    $model = $filter->filterRelated($model, $filter->buildParams($filterParams));
 
                     if (\is_null($model)) {
                         return null;
@@ -143,6 +164,16 @@ class FilterMeta implements BuilderFilter, CollectionFilter, ModelFilter
 
     public function getFilter(string $name)
     {
+        if (! $this->hasFilter($name)) {
+            if ($name === '_method') return;
+
+            throw new FilterException([
+                $name => [
+                    "The filter $name does not exist",
+                ],
+            ]);
+        }
+
         return $this->filters[$name];
     }
 
