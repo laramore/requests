@@ -20,6 +20,9 @@ return [
         Date::class => [
             //
         ],
+        Filter::class => [
+
+        ],
         OrderBy::class => [
             'allowed_values' => ['asc', 'desc', 'random'],
         ],

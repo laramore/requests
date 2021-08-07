@@ -13,12 +13,12 @@ namespace Laramore\Http\Filters;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
-use Laramore\Contracts\Configured;
+use Laramore\Contracts\Http\Filters\Filter;
 use Laramore\Traits\{
     HasLockedMacros, HasProperties, IsLocked, IsOwned
 };
 
-abstract class BaseFilter implements Configured
+abstract class BaseFilter implements Filter
 {
     use IsLocked, IsOwned, HasLockedMacros, HasProperties {
         HasLockedMacros::__call as protected callMacro;
@@ -37,7 +37,7 @@ abstract class BaseFilter implements Configured
     protected function __construct(array $properties=[])
     {
         $this->initProperties(\array_merge(
-            $this->getConfig(),
+            $this->getConfig(null, []),
             $properties
         ));
     }
@@ -114,8 +114,6 @@ abstract class BaseFilter implements Configured
     {
         return $this->name ?: Str::snake(\class_basename(static::class));
     }
-
-    abstract public function checkValue($value=null);
 
     public function buildParams($params): Collection
     {

@@ -18,6 +18,7 @@ use Laramore\Contracts\Field\RelationField;
 use Laramore\Contracts\Http\Filters\{
     BuilderFilter, CollectionFilter, ModelFilter
 };
+use Laramore\Exceptions\FilterException;
 use Laramore\Traits\Http\Filters\RequiresFieldParameter;
 
 class Append extends BaseFilter implements BuilderFilter, CollectionFilter, ModelFilter
@@ -38,7 +39,7 @@ class Append extends BaseFilter implements BuilderFilter, CollectionFilter, Mode
     public function checkValue($value=null)
     {
         if (!\in_array($value, $this->allowedValues)) {
-            throw new \Exception('Give right boolean');
+            throw new FilterException($this, 'Give a right boolean');
         }
 
         return $value === 'true';

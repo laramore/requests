@@ -18,11 +18,9 @@ use Laramore\Contracts\Eloquent\{
     LaramoreBuilder, LaramoreCollection, LaramoreMeta, LaramoreModel
 };
 use Laramore\Contracts\Http\Filters\{
-    BuilderFilter, CollectionFilter, ModelFilter,
-    RelatedFilter
+    Filter, BuilderFilter, CollectionFilter, ModelFilter, RelatedFilter
 };
 use Laramore\Exceptions\FilterException;
-use Laramore\Http\Filters\BaseFilter;
 
 class FilterMeta implements BuilderFilter, CollectionFilter, ModelFilter, RelatedFilter
 {
@@ -52,7 +50,7 @@ class FilterMeta implements BuilderFilter, CollectionFilter, ModelFilter, Relate
 
     public function getMeta(): LaramoreMeta
     {
-        return $this->getRequest()->getMeta();
+        return $this->getRequest()->modelClass()::getMeta();
     }
 
     public function buildParams($params): Collection
@@ -147,7 +145,7 @@ class FilterMeta implements BuilderFilter, CollectionFilter, ModelFilter, Relate
         return $model;
     }
 
-    public function setFilter(string $name, BaseFilter $filter)
+    public function setFilter(string $name, Filter $filter)
     {
         // $this->needsToBeUnlocked();
         $filter->ownedBy($this, Str::snake($name));
@@ -167,11 +165,7 @@ class FilterMeta implements BuilderFilter, CollectionFilter, ModelFilter, Relate
         if (! $this->hasFilter($name)) {
             if ($name === '_method') return;
 
-            throw new FilterException([
-                $name => [
-                    "The filter $name does not exist",
-                ],
-            ]);
+            throw new FilterException($name, "The filter $name does not exist");
         }
 
         return $this->filters[$name];

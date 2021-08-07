@@ -77,6 +77,7 @@ class Search extends BaseFilter implements BuilderFilter
     public function filterCollection(LaramoreCollection $collection, $value, Field $field=null, OperatorElement $operator=null)
     {
         if (!($field instanceof AttributeField)) {
+            // TODO: search in non attribute fields.
         }
     }
 

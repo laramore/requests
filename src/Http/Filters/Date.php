@@ -38,7 +38,7 @@ class Date extends BaseFilter implements BuilderFilter
             $value = $params->get('value');
 
             if (\is_array($value)) {
-                $operator = $params->get('operator');
+                $operator = $params->get('operator'); // TODO: With COLLECTION_TYPE.
 
                 foreach ($value as $subValue) {
                     $builder->where(function ($subBuilder) use ($field, $operator, $subValue) {
