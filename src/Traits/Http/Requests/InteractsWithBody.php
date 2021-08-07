@@ -43,4 +43,14 @@ trait InteractsWithBody
 
         return Arr::get($this->body->all(), $key, $default);
     }
+
+    /**
+     * Get data to be validated from the request.
+     *
+     * @return array
+     */
+    public function validationData()
+    {
+        return $this->body();
+    }
 }

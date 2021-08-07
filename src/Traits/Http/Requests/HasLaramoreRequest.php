@@ -15,9 +15,12 @@ use Illuminate\Database\Eloquent\{
     Builder, Collection
 };
 use Illuminate\Pagination\Paginator;
-use Laramore\Facades\Validation;
-use Laramore\Contracts\Eloquent\LaramoreModel;
+use Laramore\Contracts\Eloquent\{
+    LaramoreMeta, LaramoreModel
+};
+use Laramore\Contracts\Field\RelationField;
 use Laramore\Eloquent\FilterMeta;
+use Laramore\Facades\Option;
 
 trait HasLaramoreRequest
 {
@@ -50,6 +53,13 @@ trait HasLaramoreRequest
      * @var Collection
      */
     protected $paginate;
+
+    /**
+     * All inputs.
+     *
+     * @var array
+     */
+    protected $inputs;
 
     /**
      * All filters.
@@ -203,36 +213,6 @@ trait HasLaramoreRequest
     }
 
     /**
-     * Retrieve an input item from the request.
-     *
-     * @param  string|null  $key
-     * @param  mixed  $default
-     * @return mixed
-     */
-    public function input($key = null, $default = null)
-    {
-        if (is_null($key)) {
-            $all = parent::input($key, $default);
-
-            foreach ($all as $key => $value) {
-                if (! $this->meta()->hasField($key)) continue;
-
-                $all[$key] = $this->meta()->getField($key)->cast($value);
-            }
-
-            return $all;
-        }
-
-        $value = parent::input($key, $default);
-
-        if (! $this->meta()->hasField($key)) {
-            return $value;
-        }
-
-        return $this->meta()->getField($key)->cast($value);
-    }
-
-    /**
      * Return the validated model.
      *
      * @return LaramoreModel|mixed
@@ -274,6 +254,23 @@ trait HasLaramoreRequest
         return $this->paginate;
     }
 
+    public static function resolveFieldsFromMeta(LaramoreMeta $meta)
+    {
+        $fields = $meta->getFields();
+        $visibleOption = Option::visible();
+        $names = [];
+
+        foreach ($fields as $field) {
+            if (! $field->hasOption($visibleOption) || ($field instanceof RelationField)) continue;
+
+            if ($field->getOwner() === $meta || \in_array($field->getOwner(), $fields)) {
+                $names[] = $field->getNative();
+            }
+        }
+
+        return $names;
+    }
+
     /**
      * Return all accepted fields.
      *
@@ -281,17 +278,7 @@ trait HasLaramoreRequest
      */
     public function fields(): array
     {
-        $meta = $this->meta();
-        $requiredFields = $meta->getFieldsWithOption('required');
-        $requiredFieldNames = [];
-
-        foreach ($requiredFields as $field) {
-            if ($field->getOwner() === $meta || \in_array($field->getOwner(), $requiredFields)) {
-                $requiredFieldNames[] = $field->getNative();
-            }
-        }
-
-        return $requiredFieldNames;
+        return static::resolveFieldsFromMeta($this->meta());
     }
 
     /**
@@ -323,7 +310,16 @@ trait HasLaramoreRequest
      */
     public function rules()
     {
-        $rules = Validation::getHandler($this->modelClass())->getRules($this->allowed(), true);
+        $keys = $this->allowedBody();
+        $meta = $this->meta();
+
+        $rules = [];
+
+        foreach ($keys as $key) {
+            $rules = array_merge_recursive(
+                $rules, $meta->getField($key)->getRules()
+            );
+        }
 
         if (\in_array($this->method(), $this->removeRequired)) {
             return \array_map(function ($fieldRules) {
@@ -339,9 +335,48 @@ trait HasLaramoreRequest
             if (\count($keys)) {
                 $rules = \array_merge($rules, \array_fill_keys($keys, ['forbidden']));
             }
+
+            // TODO: Check sub for forbidden.
         }
 
         return $rules;
+    }
+
+    /**
+     * Get the validated data from the request.
+     *
+     * @return array
+     */
+    public function validated(string $key=null, $default=null)
+    {
+        $data = parent::validated();
+
+        if (is_null($key)) {
+            if (isset($data)) {
+                return $data;
+            }
+
+            $keys = array_keys(parent::input());
+            $data = [];
+
+            foreach ($keys as $key) {
+                $data[$key] = $this->input($key);
+            }
+
+            return $data;
+        }
+
+        if (isset($data[$key])) {
+            return $data[$key];
+        }
+
+        $value = parent::input($key, $default);
+
+        if (! $this->meta()->hasField($key)) {
+            return $value;
+        }
+
+        return $this->meta()->getField($key)->cast($value);
     }
 
     public function filters()
@@ -401,7 +436,7 @@ trait HasLaramoreRequest
             return parent::__call($method, $parameters);
         }
 
-        $modelName = $this->meta()->getModelName();
+        $modelName = Str::camel($this->meta()->getModelName());
 
         if ($method === $modelName) {
             return $this->model();

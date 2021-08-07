@@ -10,12 +10,8 @@
 
 namespace Laramore\Traits\Http\Requests;
 
-use Illuminate\Support\{
-    Arr, Str
-};
-use Laramore\Contracts\Field\ManyRelationField;
+use Illuminate\Support\Str;
 use Laramore\Contracts\Field\RelationField;
-use Laramore\Facades\Operator;
 
 trait HasLaramoreRelatedRequest
 {
@@ -26,9 +22,16 @@ trait HasLaramoreRelatedRequest
     /**
      * Root model class for relation.
      *
-     * @var array
+     * @var string
      */
     protected $rootModelClass;
+
+    /**
+     * Related relation name.
+     *
+     * @var string
+     */
+    protected $relatedName;
 
     /**
      * Related resolved models.
@@ -57,6 +60,82 @@ trait HasLaramoreRelatedRequest
         return $this->relatedModels;
     }
 
+    public function relatedModel(string $name=null)
+    {
+        if (! is_null($name)) {
+            return $this->relatedModels()[$name];
+        }
+
+        return $this->relatedModels()[$name];
+    }
+
+    public function relatedName()
+    {
+        if (! is_null($this->relatedName)) {
+            return $this->relatedName;
+        }
+
+        $meta = $this->meta();
+        $names = array_keys($this->route()->parameters());
+        $name = array_pop($names);
+
+        if ($meta->hasField($name, RelationField::class)) {
+            return $this->relatedName = $name;
+        }
+
+        $name = Str::plural($name);
+
+        if ($meta->hasField($name, RelationField::class)) {
+            return $this->relatedName = $name;
+        }
+
+        $name = array_pop($names);
+
+        if ($meta->hasField($name, RelationField::class)) {
+            return $this->relatedName = $name;
+        }
+
+        $name = Str::plural($name);
+
+        if ($meta->hasField($name, RelationField::class)) {
+            return $this->relatedName = $name;
+        }
+
+        throw new \Exception('Related name required for resolution');
+    }
+
+    public function relatedField()
+    {
+        return $this->meta()->getField($this->relatedName());
+    }
+
+    /**
+     * Return all accepted fields.
+     *
+     * @return array<string>
+     */
+    public function fields(): array
+    {
+        $fields = parent::fields();
+        $relatedField = $this->relatedField();
+        $fieldsToRemove = [$relatedField->getName()];
+        $decomposed = $relatedField->decompose();
+
+        if (isset($decomposed[$this->modelClass()])) {
+            $fieldsToRemove = array_merge($fieldsToRemove, array_map(function ($field) {
+                return $field->getName();
+            }, $decomposed[$this->modelClass()]));
+        }
+
+        foreach ($fieldsToRemove as $name) {
+            if (($key = array_search($name, $fields)) !== false) {
+                unset($fields[$key]);
+            }
+        }
+
+        return array_values($fields);
+    }
+
     /**
      * Resolve the model.
      *
@@ -65,50 +144,49 @@ trait HasLaramoreRelatedRequest
     public function resolveModel()
     {
         $parameters = $this->route()->parameters();
-        $keys = array_keys($parameters);
-        $name = end($keys);
-        $value = $parameters[$name];
-        unset($parameters[$name]);
-
+        $names = array_keys($parameters);
         $related = null;
 
-        foreach ($parameters as $name => $key) {
+        while ($name = array_shift($names)) {
             $pastRelated = $related;
+            $key = $parameters[$name];
 
             if (is_null($related)) {
+                // Is null, we start from root model.
                 $related = $this->rootModelClass()::findOrFail($key);
-            } else if ($related::getMeta()->hasField($name, RelationField::class)) {
-                $related = $related->newRelationQuery($name)->findOrFail($key);
             } else {
-                $name = Str::plural($name);
-
-                $related = $related->newRelationQuery($name)->findOrFail($key);
+                // We keep going throught relations.
+                if ($related::getMeta()->hasField($name, RelationField::class)) {
+                    $related = $related->newRelationQuery($name)->findOrFail($key);
+                } else {
+                    $related = $related->newRelationQuery(Str::plural($name))->findOrFail($key);
+                }
             }
 
             $related = $this->filterMeta()->filterRelated($related, $this->filters());
-            $related->setRelationValue($name, $pastRelated);
+            $related->setRelation($name, $pastRelated);
 
             $this->relatedModels[$name] = $related;
+
+            // If it is the last parameter, we need to check the model class.
+            if (count($names) === 1) {
+                $field = $this->relatedField();
+                $reversedField = $field->getReversedField();
+
+                // If we just found it, find or fail it.
+                if (get_class($related) === $reversedField->getMeta()->getModelClass()) {
+                    // TODO: Filter builder.
+                    return $related->newRelationQuery($reversedField->getName())->findOrFail($parameters[$names[0]])
+                        ->setRelation($field->getName(), $related);
+                }
+            }
         }
 
         if (is_null($related)) {
             throw new \LogicException(static::class.' must be related');
         }
 
-        $meta = $this->meta();
-
-        if ($meta->hasField($name, RelationField::class)) {
-            $reversedName = $meta->getField($name)->getReversedField()->getName();
-        } else {
-            $name = Str::plural($name);
-
-            $reversedName = $meta->getField($name)->getReversedField()->getName();
-        }
-
-        // TODO: Filter builder.
-        // return $this->filterMeta()->filterBuilder($related->newRelationQuery($reversedName), $this->filters())->get()
-        return $related->newRelationQuery($reversedName)->findOrFail($value)
-            ->setRelationValue($name, $related);
+        return $this->generateModel()->setRelation($this->relatedName(), $related);
     }
 
     /**
@@ -119,23 +197,27 @@ trait HasLaramoreRelatedRequest
     public function resolveModels()
     {
         $parameters = $this->route()->parameters();
+        $names = array_keys($parameters);
         $related = null;
 
-        foreach ($parameters as $name => $key) {
+        while ($name = array_shift($names)) {
             $pastRelated = $related;
+            $key = $parameters[$name];
 
             if (is_null($related)) {
+                // Is null, we start from root model.
                 $related = $this->rootModelClass()::findOrFail($key);
-            } else if ($related::getMeta()->hasField($name, RelationField::class)) {
-                $related = $related->newRelationQuery($name)->findOrFail($key);
             } else {
-                $name = Str::plural($name);
-
-                $related = $related->newRelationQuery($name)->findOrFail($key);
+                // We keep going throught relations.
+                if ($related::getMeta()->hasField($name, RelationField::class)) {
+                    $related = $related->newRelationQuery($name)->findOrFail($key);
+                } else {
+                    $related = $related->newRelationQuery(Str::plural($name))->findOrFail($key);
+                }
             }
 
             $related = $this->filterMeta()->filterRelated($related, $this->filters());
-            $related->setRelationValue($name, $pastRelated);
+            $related->setRelation($name, $pastRelated);
 
             $this->relatedModels[$name] = $related;
         }
@@ -144,22 +226,8 @@ trait HasLaramoreRelatedRequest
             throw new \LogicException(static::class.' must be related');
         }
 
-        $meta = $this->meta();
-        $keys = array_keys($parameters);
-        $name = end($keys);
-
-        if ($meta->hasField($name, RelationField::class)) {
-            $reversedName = $meta->getField($name)->getReversedField()->getName();
-        } else {
-            $name = Str::plural($name);
-
-            $reversedName = $meta->getField($name)->getReversedField()->getName();
-        }
-
         // TODO: Filter builder.
-        // return $this->filterMeta()->filterBuilder($related->newRelationQuery($reversedName), $this->filters())->get()
-        return $related->newRelationQuery($reversedName)->get()
-            ->each->setRelationValue($name, $related);
+        return $related->newRelationQuery($this->relatedField()->getReversedField()->getName())->get();
     }
 
     /**
@@ -171,22 +239,18 @@ trait HasLaramoreRelatedRequest
      *
      * @throws \BadMethodCallException
      */
-    // public function __call($method, $parameters)
-    // {
-    //     if (static::hasMacro($method)) {
-    //         return parent::__call($method, $parameters);
-    //     }
+    public function __call($method, $parameters)
+    {
+        if (static::hasMacro($method)) {
+            return parent::__call($method, $parameters);
+        }
 
-    //     $modelName = $this->meta()->getModelName();
+        $models = \array_keys($this->relatedModels());
 
-    //     if ($method === $modelName) {
-    //         return $this->model();
-    //     }
+        if (in_array($snakeName = Str::snake($method), $models)) {
+            return $this->relatedModel($snakeName);
+        }
 
-    //     if ($method === Str::plural($modelName)) {
-    //         return $this->models();
-    //     }
-
-    //     return parent::__call($method, $parameters);
-    // }
+        return parent::__call($method, $parameters);
+    }
 }
