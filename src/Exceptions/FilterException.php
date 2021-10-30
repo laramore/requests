@@ -19,23 +19,38 @@ class FilterException extends LaramoreException
 
     protected $errors;
 
-    public function __construct(Filter $filter, $errors, int $code=400)
+    public function __construct(Filter|string $filter, $errors, int $code=400)
     {
         $this->filter = $filter;
         $this->errors = Arr::wrap($errors);
 
-        parent::__construct("Filter {$filter->getName()} excepted: ".implode('. ', $this->errors), $code);
+        parent::__construct("Filter {$this->name()} excepted: ".implode('. ', $this->errors), $code);
     }
 
     /**
      * Return the filter that threw the exception.
      *
-     * @return Filter
+     * @return Filter|string
      */
-    public function filter(): Filter
+    public function filter(): Filter|string
     {
         return $this->filter;
     }
+
+    /**
+     * Return the filter name that threw the exception.
+     *
+     * @return Filter|string
+     */
+    public function name(): string
+    {
+        if ($this->filter instanceof Filter) {
+            return $this->filter->getName();
+        }
+
+        return $this->filter;
+    }
+
 
     /**
      * Return the filter that threw the exception.
@@ -45,7 +60,7 @@ class FilterException extends LaramoreException
     public function errors(): array
     {
         return [
-            $this->filter->getName() => $this->errors,
+            $this->name() => $this->errors,
         ];
     }
 }

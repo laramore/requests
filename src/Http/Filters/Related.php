@@ -1,6 +1,6 @@
 <?php
 /**
- * Filter to filter values on a specific field.
+ * Filter values on a specific field.
  * Ex: show only users with a specific father.
  * Both father or father_id can be used (the composed field or the unique attribute).
  *
@@ -17,11 +17,15 @@ namespace Laramore\Http\Filters;
 
 use Illuminate\Support\Collection;
 use Laramore\Contracts\Eloquent\LaramoreBuilder;
-use Laramore\Contracts\Field\ComposedField;
+use Laramore\Contracts\Field\{
+    Field, ComposedField,
+    RelationField
+};
 use Laramore\Contracts\Http\Filters\BuilderFilter;
+use Laramore\Elements\OperatorElement;
 use Laramore\Traits\Http\Filters\HasOperatorParameter;
 
-class Filter extends BaseFilter implements BuilderFilter
+class Related extends BaseFilter implements BuilderFilter
 {
     use HasOperatorParameter;
 
@@ -35,7 +39,7 @@ class Filter extends BaseFilter implements BuilderFilter
         ];
     }
 
-    public function getField()
+    public function getField(): Field
     {
         $this->needsToBeOwned();
 
@@ -49,14 +53,22 @@ class Filter extends BaseFilter implements BuilderFilter
         $meta = $this->getOwner()->getMeta();
 
         $this->field = $meta->getField($this->getName());
+
+        if (! ($this->field instanceof RelationField)) {
+            throw new \Exception("The field {$this->getName()} is not a relation field");
+        }
     }
 
-    public function checkValue($value=null)
+    public function checkValue($value=null, Collection $params=null)
     {
-        // TODO.
-
         if ($this->getField() instanceof ComposedField) {
-            return explode(',', $value);
+            if ($params->get('operator')->needs(OperatorElement::COLLECTION_TYPE)) {
+                return $value->map(function ($subValue) {
+                    return new Collection(explode(',', $subValue));
+                });
+            }
+
+            return new Collection(explode(',', $value));
         }
 
         return $value;
@@ -64,6 +76,14 @@ class Filter extends BaseFilter implements BuilderFilter
 
     public function filterBuilder(LaramoreBuilder $builder, Collection $params): ?LaramoreBuilder
     {
-        return $this->getField()->where($builder, $params->get('operator'), $params->get('value'));
+        $field = $this->getField();
+        $operator = $params->get('operator');
+        $method = $operator->getWhereMethod();
+
+        if (method_exists($field, $method) || $field::hasMacro($method)) {
+            return \call_user_func([$field, $method], $builder, collect($params->get('value')));
+        }
+
+        return $field->where($builder, $operator, $params->get('value'));
     }
 }

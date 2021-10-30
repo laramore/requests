@@ -14,6 +14,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Laramore\Contracts\Http\Filters\Filter;
+use Laramore\Exceptions\FilterException;
 use Laramore\Traits\{
     HasLockedMacros, HasProperties, IsLocked, IsOwned
 };
@@ -117,28 +118,35 @@ abstract class BaseFilter implements Filter
 
     public function buildParams($params): Collection
     {
-        $builtParams = collect();
-
-        if (!\is_array($params)) {
-            $params = ['value' => $this->checkValue($params)];
+        if (! \is_array($params)) {
+            $params = ['value' => $params];
         }
 
         $defaultParams = $this->getDefaultParams();
-        $params = \array_merge($defaultParams, $params);
+        $params = new Collection(\array_merge($defaultParams, $params));
 
-        foreach ($params as $subName => $subValue) {
-            if (\method_exists($this, $method = 'check'.Str::studly($subName))) {
-                $subValue = \call_user_func([$this, $method], $subValue, $params);
+        if (! $params->has('value')) {
+            throw new FilterException($this, 'Missing value for filter');
+        }
+
+        if (count($params) !== count($defaultParams)) {
+            $keys = implode(', ', array_diff(array_keys($params->toArray()), array_keys($defaultParams)));
+
+            throw new FilterException($this, 'Some parameters are not allowed for this filter: '.$keys);
+        }
+
+        // Follow keys and retrieve at execution the value.
+        $keys = $params->keys();
+
+        foreach ($keys as $key) {
+            if (\method_exists($this, $method = 'check'.Str::studly($key))) {
+                $subValue = \call_user_func([$this, $method], $params->get($key), $params);
             }
 
-            $builtParams->put($subName, $subValue);
+            $params->put($key, $subValue);
         }
 
-        if (!$builtParams->has('value')) {
-            throw new \Exception('Missing value for filter !');
-        }
-
-        return $builtParams;
+        return $params;
     }
 
     protected function locking()

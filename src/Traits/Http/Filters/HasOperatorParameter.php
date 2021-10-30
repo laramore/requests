@@ -10,6 +10,7 @@
 
 namespace Laramore\Traits\Http\Filters;
 
+use Illuminate\Support\Collection;
 use Laramore\Elements\OperatorElement;
 use Laramore\Facades\Operator;
 
@@ -17,7 +18,7 @@ trait HasOperatorParameter
 {
     protected $operators;
 
-    public function checkOperator($operator=null): OperatorElement
+    public function checkOperator($operator, Collection $params): OperatorElement
     {
         $operator = ($operator ?? '=');
 
@@ -25,6 +26,12 @@ trait HasOperatorParameter
             throw new \Error("Wrong operator `$operator`");
         }
 
-        return Operator::find($operator);
+        $opElement = Operator::find($operator);
+
+        if ($opElement->needs(OperatorElement::COLLECTION_TYPE)) {
+            $params->put('value', collect($params->get('value')));
+        }
+
+        return $opElement;
     }
 }

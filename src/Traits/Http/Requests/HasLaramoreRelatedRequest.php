@@ -11,6 +11,7 @@
 namespace Laramore\Traits\Http\Requests;
 
 use Illuminate\Support\Str;
+use Laramore\Contracts\Field\ComposedField;
 use Laramore\Contracts\Field\RelationField;
 
 trait HasLaramoreRelatedRequest
@@ -119,17 +120,20 @@ trait HasLaramoreRelatedRequest
         $fields = parent::fields();
         $relatedField = $this->relatedField();
         $fieldsToRemove = [$relatedField->getName()];
-        $decomposed = $relatedField->decompose();
 
-        if (isset($decomposed[$this->modelClass()])) {
-            $fieldsToRemove = array_merge($fieldsToRemove, array_map(function ($field) {
-                return $field->getName();
-            }, $decomposed[$this->modelClass()]));
-        }
+        if ($relatedField instanceof ComposedField) {
+            $decomposed = $relatedField->decompose();
 
-        foreach ($fieldsToRemove as $name) {
-            if (($key = array_search($name, $fields)) !== false) {
-                unset($fields[$key]);
+            if (isset($decomposed[$this->modelClass()])) {
+                $fieldsToRemove = array_merge($fieldsToRemove, array_map(function ($field) {
+                    return $field->getName();
+                }, $decomposed[$this->modelClass()]));
+            }
+
+            foreach ($fieldsToRemove as $name) {
+                if (($key = array_search($name, $fields)) !== false) {
+                    unset($fields[$key]);
+                }
             }
         }
 

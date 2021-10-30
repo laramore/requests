@@ -36,7 +36,7 @@ class OrderBy extends BaseFilter implements BuilderFilter, CollectionFilter
         ];
     }
 
-    public function checkValue($value=null, array $params=[])
+    public function checkValue($value=null, Collection $params=null)
     {
         if (\in_array($value, $this->allowedValues)) {
             if ($value === 'random' && !\is_null($params['field'])) {
