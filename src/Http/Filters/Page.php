@@ -20,7 +20,7 @@ class Page extends BaseFilter
         ];
     }
 
-    public function checkValue($value)
+    public function checkValue($value=null)
     {
         return (int) $value;
     }
