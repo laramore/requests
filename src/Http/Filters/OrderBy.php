@@ -18,6 +18,7 @@ use Laramore\Contracts\Field\AttributeField;
 use Laramore\Contracts\Http\Filters\{
     BuilderFilter, CollectionFilter
 };
+use Laramore\Exceptions\FilterException;
 use Laramore\Traits\Http\Filters\HasFieldParameter;
 
 class OrderBy extends BaseFilter implements BuilderFilter, CollectionFilter
@@ -40,7 +41,7 @@ class OrderBy extends BaseFilter implements BuilderFilter, CollectionFilter
     {
         if (\in_array($value, $this->allowedValues)) {
             if ($value === 'random' && !\is_null($params['field'])) {
-                throw new \Exception('Cannot be random and have a field');
+                throw new FilterException($this, 'Cannot be random and have a field');
             }
 
             return $value;
@@ -52,7 +53,7 @@ class OrderBy extends BaseFilter implements BuilderFilter, CollectionFilter
             }, $value);
         }
 
-        throw new \Exception('Use right value');
+        throw new FilterException($this, 'Use right value');
     }
 
     public function checkField($fieldName=null, array $params=[])

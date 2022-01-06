@@ -38,6 +38,13 @@ class FilterMeta implements BuilderFilter, CollectionFilter, ModelFilter, Relate
      */
     protected $filters = [];
 
+    /**
+     * Paginate.
+     *
+     * @var bool
+     */
+    protected $paginate = false;
+
     public function __construct($request)
     {
         $this->request = $request;
@@ -51,6 +58,16 @@ class FilterMeta implements BuilderFilter, CollectionFilter, ModelFilter, Relate
     public function getMeta(): LaramoreMeta
     {
         return $this->getRequest()->modelClass()::getMeta();
+    }
+
+    public function paginate($paginate = true)
+    {
+        $this->paginate = $paginate;
+    }
+
+    public function doesPaginate()
+    {
+        return $this->paginate;
     }
 
     public function buildParams($params): Collection
@@ -163,7 +180,8 @@ class FilterMeta implements BuilderFilter, CollectionFilter, ModelFilter, Relate
     public function getFilter(string $name)
     {
         if (! $this->hasFilter($name)) {
-            if ($name === '_method') return;
+            if ($this->doesPaginate() && in_array($name, ['cursor', 'page'])) return;
+            // if ($name === '_method') return; ??
 
             throw new FilterException($name, "The filter $name does not exist");
         }

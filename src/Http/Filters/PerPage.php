@@ -13,6 +13,7 @@ namespace Laramore\Http\Filters;
 use Illuminate\Support\Collection;
 use Laramore\Contracts\Eloquent\LaramoreBuilder;
 use Laramore\Contracts\Http\Filters\BuilderFilter;
+use Laramore\Exceptions\FilterException;
 
 class PerPage extends BaseFilter implements BuilderFilter
 {
@@ -34,7 +35,7 @@ class PerPage extends BaseFilter implements BuilderFilter
         $perPage = (int) $value;
 
         if ($perPage < $this->min || $perPage > $this->max) {
-            throw new \Exception("Min per page `{$this->min}` and max `{$this->max}`");
+            throw new FilterException($this, "Min per page `{$this->min}` and max `{$this->max}`");
         }
 
         return $perPage;
