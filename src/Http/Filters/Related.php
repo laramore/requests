@@ -23,6 +23,7 @@ use Laramore\Contracts\Field\{
 };
 use Laramore\Contracts\Http\Filters\BuilderFilter;
 use Laramore\Elements\OperatorElement;
+use Laramore\Exceptions\FilterException;
 use Laramore\Traits\Http\Filters\HasOperatorParameter;
 
 class Related extends BaseFilter implements BuilderFilter
@@ -55,7 +56,7 @@ class Related extends BaseFilter implements BuilderFilter
         $this->field = $meta->getField($this->getName());
 
         if (! ($this->field instanceof RelationField)) {
-            throw new \Exception("The field {$this->getName()} is not a relation field");
+            throw new FilterException($this, "The field {$this->getName()} is not a relation field");
         }
     }
 

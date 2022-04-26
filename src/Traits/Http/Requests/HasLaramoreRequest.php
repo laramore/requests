@@ -52,7 +52,7 @@ trait HasLaramoreRequest
      *
      * @var Collection
      */
-    protected $paginate;
+    protected $pagination;
 
     /**
      * All inputs.
@@ -168,12 +168,32 @@ trait HasLaramoreRequest
     }
 
     /**
+     * Resolve pagination.
+     *
+     * @return Collection|null
+     */
+    public function resolvePagination()
+    {
+        $query = $this->generateModelQuery();
+
+        if ($this->has('cursor')) {
+            return $query->cursorPaginate();
+        }
+
+        return $query->paginate();
+    }
+
+    /**
      * Resolve models.
      *
      * @return Collection|null
      */
     public function resolveModels()
     {
+        if ($this->filterMeta()->doesPaginate()) {
+            $this->resolvePagination()->getCollection();
+        }
+
         return $this->generateModelQuery()->get();
     }
 
@@ -194,11 +214,15 @@ trait HasLaramoreRequest
      *
      * @return Paginator|mixed
      */
-    public function getPaginate()
+    public function getPagination()
     {
-        $paginate = $this->generateModelQuery()->paginate();
+        $pagination = $this->resolvePagination();
 
-        return $this->filterMeta()->filterCollection($paginate, $this->filters());
+        $pagination->setCollection(
+            $this->filterMeta()->filterCollection($pagination->getCollection(), $this->filters())
+        );
+
+        return $pagination;
     }
 
     /**
@@ -234,7 +258,11 @@ trait HasLaramoreRequest
     public function models()
     {
         if (\is_null($this->models)) {
-            $this->models = $this->getModels();
+            if ($this->filterMeta()->doesPaginate()) {
+                $this->pagination();
+            } else {
+                $this->models = $this->getModels();
+            }
         }
 
         return $this->models;
@@ -245,13 +273,15 @@ trait HasLaramoreRequest
      *
      * @return Paginator|mixed
      */
-    public function paginate()
+    public function pagination()
     {
-        if (\is_null($this->paginate)) {
-            $this->paginate = $this->getPaginate();
+        if (\is_null($this->pagination)) {
+            $this->pagination = $this->getPagination();
+
+            $this->models = $this->pagination->getCollection();
         }
 
-        return $this->paginate;
+        return $this->pagination;
     }
 
     public static function resolveFieldsFromMeta(LaramoreMeta $meta)

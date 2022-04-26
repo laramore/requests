@@ -13,6 +13,7 @@ namespace Laramore\Http\Filters;
 use Illuminate\Support\Collection;
 use Laramore\Contracts\Eloquent\LaramoreBuilder;
 use Laramore\Contracts\Http\Filters\BuilderFilter;
+use Laramore\Exceptions\FilterException;
 
 class Trash extends BaseFilter implements BuilderFilter
 {
@@ -31,7 +32,7 @@ class Trash extends BaseFilter implements BuilderFilter
             return $value;
         }
 
-        throw new \Exception("{$value} is not allowed for filter. Use only ".\implode(', ', $this->allowedValues));
+        throw new FilterException($this, "{$value} is not allowed for filter. Use only ".\implode(', ', $this->allowedValues));
     }
 
     public function filterBuilder(LaramoreBuilder $builder, Collection $params): ?LaramoreBuilder
