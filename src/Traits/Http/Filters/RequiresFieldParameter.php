@@ -10,11 +10,13 @@
 
 namespace Laramore\Traits\Http\Filters;
 
+use Illuminate\Support\Collection;
+
 trait RequiresFieldParameter
 {
     use HasFieldParameter;
 
-    public function checkValue($value=null, array $params=[])
+    public function checkValue($value=null, Collection $params=null)
     {
         if (!isset($params['field'])) {
             throw new \Exception('Field required');

@@ -27,6 +27,7 @@ class Date extends BaseFilter implements BuilderFilter
         return [
             'field' => null,
             'operator' => ($this->operators[0] ?? '='),
+            'value' => null,
         ];
     }
 
