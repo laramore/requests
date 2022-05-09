@@ -39,6 +39,8 @@ trait InteractsWithBody
             } else {
                 $this->body = \in_array($this->getRealMethod(), ['GET', 'HEAD']) ? new ParameterBag() : $this->request;
             }
+
+            $this->body->add($this->allFiles());
         }
 
         return Arr::get($this->body->all(), $key, $default);
