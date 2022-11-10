@@ -191,7 +191,14 @@ trait HasLaramoreRequest
     public function resolveModels()
     {
         if ($this->filterMeta()->doesPaginate()) {
-            $this->resolvePagination()->getCollection();
+            $pagination = $this->resolvePagination();
+
+            header('Pagination-Count: '. $pagination->perPage());
+            header('Pagination-Page: '. $pagination->currentPage());
+            header('Pagination-Limit: '. $pagination->lastPage());
+            header('Pagination-Total: '. $pagination->total());
+
+            return $pagination->getCollection();
         }
 
         return $this->generateModelQuery()->get();
@@ -258,11 +265,7 @@ trait HasLaramoreRequest
     public function models()
     {
         if (\is_null($this->models)) {
-            if ($this->filterMeta()->doesPaginate()) {
-                $this->pagination();
-            } else {
-                $this->models = $this->getModels();
-            }
+            $this->models = $this->getModels();
         }
 
         return $this->models;
